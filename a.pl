@@ -8,15 +8,17 @@
 /**
  * map for the agent
  **/
-map_height(3).
-map_width(3).
+map_xlimit(3).
+map_ylimit(3).
 covid(1, 0).
 covid(0, 1).
 finish(2, 0).
 man(a).
 
+% if we are in final cell, then all done
 find_way(Xfinish, Yfinish, Xfinish, Yfinish, _, _, [], _) :- !.
 
+% backtracking search
 find_way(Xcurrent, Ycurrent, Xfinish, Yfinish, Xmax, Ymax, 
     [[Xcurrent, Ycurrent] | PathTaken], Visited) :-
     Yup is Ycurrent + 1,
@@ -49,6 +51,8 @@ find_way(Xcurrent, Ycurrent, Xfinish, Yfinish, Xmax, Ymax,
           PathTaken, [[Xcurrent, Ycurrent] | Visited])
      ).
 
-solve(Xcurrent, Ycurrent, Xfinish, Yfinish, Xmax, Ymax, PathTaken, Visited) :-
-    find_way(Xcurrent, Ycurrent, Xfinish, Yfinish, Xmax, Ymax, PathTaken, Visited),
-    print(PathTaken).
+% Simplification of function call
+find_way_to(X, Y, Path) :-
+     map_xlimit(Xmax),
+     map_ylimit(Ymax),
+     find_way(0, 0, X, Y, Xmax, Ymax, Path, []).
