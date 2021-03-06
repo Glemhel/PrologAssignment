@@ -10,49 +10,42 @@
  **/
 map_xlimit(3).
 map_ylimit(3).
-covid(1, 0).
-covid(0, 1).
-finish(2, 0).
-man(a).
+covid((1, 0)).
+covid((0, 1)).
+
+
+get_adjacent((X, Y), L) :-
+     Yup is Y + 1,
+     Ydown is Y - 1,
+     Xup is X + 1,
+     Xdown is X - 1,
+     L = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
+          (Xdown, Ydown)].
+
+
+inside_map((X, Y)) :-
+     map_xlimit(Xmax),
+     map_ylimit(Ymax),
+     X =< Xmax,
+     Y =< Ymax,
+     X >= 0,
+     Y >= 0.
+
 
 % if we are in final cell, then all done
-find_way(Xfinish, Yfinish, Xfinish, Yfinish, _, _, [], _) :- !.
+find_way(Xfinish, Yfinish, [[Xfinish, Yfinish]], _, (Xfinish, Yfinish)) :- !.
 
 % backtracking search
-find_way(Xcurrent, Ycurrent, Xfinish, Yfinish, Xmax, Ymax, 
-    [[Xcurrent, Ycurrent] | PathTaken], Visited) :-
-    Yup is Ycurrent + 1,
-    Ydown is Ycurrent - 1,
-    Xup is Xcurrent + 1,
-    Xdown is Xcurrent - 1,
-    Xcurrent =< Xmax,
-    Ycurrent =< Ymax,
-    Xcurrent >= 0,
-    Ycurrent >= 0,
-
-    not(covid(Xcurrent, Ycurrent)),
-    not(member([Xcurrent, Ycurrent], Visited)),
-    (
-     find_way(Xup, Yup, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xcurrent, Yup, Xfinish, Yfinish, Xmax, Ymax, 
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xup, Ycurrent, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xcurrent, Ydown, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xup, Ydown, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xdown, Ycurrent, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xdown, Yup, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited]);
-     find_way(Xdown, Ydown, Xfinish, Yfinish, Xmax, Ymax,
-          PathTaken, [[Xcurrent, Ycurrent] | Visited])
-     ).
+find_way(Xfinish, Yfinish, 
+    [[Xcurrent, Ycurrent] | PathTaken], Visited, (Xcurrent, Ycurrent)) :-
+    member([Xcurrent, Ycurrent], Visited),
+    get_adjacent((Xcurrent, Ycurrent), Adjacent_cells),
+    exclude(covid, Adjacent_cells, Possible_cells),
+    include(inside_map, Possible_cells, Possible_cells1),
+    include(find_way(Xfinish, Yfinish,
+          PathTaken, [[Xcurrent, Ycurrent] | Visited]), Possible_cells1, Found_way_cells),
+    not(length(Found_way_cells, 0)).
 
 % Simplification of function call
 find_way_to(X, Y, Path) :-
-     map_xlimit(Xmax),
-     map_ylimit(Ymax),
-     find_way(0, 0, X, Y, Xmax, Ymax, Path, []).
+     find_way(X, Y, Path, Visited, (0, 0)).
