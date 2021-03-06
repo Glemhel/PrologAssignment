@@ -8,12 +8,12 @@
 /**
  * map for the agent
  **/
-map_xlimit(2).
-map_ylimit(2).
-covid([40, 40]).
-%covid([3, 8]).
-doctor([10, 20]).
-mask([10, 10]).
+map_xlimit(9).
+map_ylimit(9).
+covid([0, 2]).
+covid([20, 0]).
+doctor([0, 5]).
+mask([110, 0]).
 
 get_adjacent([X, Y], L) :-
      Yup is Y + 1,
@@ -73,23 +73,5 @@ find_way([Xcurrent, Ycurrent, Safety], [Xfinish, Yfinish], Visited, [[Xcurrent, 
 find_way([Xfinish, Yfinish, _], [Xfinish, Yfinish], _, [[Xfinish, Yfinish]]) :-
      true, !.
 
-
 find_way_to(X, Y, Path) :-
      find_way([0, 0, 0], [X, Y], [], Path).
-
-
-find_way_to4(X, Y, Path) :-
-     find_way4([0, 0], [X, Y], [], Path). 
-
-find_way4([Xfinish, Yfinish], [Xfinish, Yfinish], _, [[Xfinish, Yfinish]]) :-
-     true, !.
-
-find_way4([Xcurrent, Ycurrent], [Xfinish, Yfinish], Visited, [[Xcurrent, Ycurrent] | Path]) :-
-     is_adjacent([Xcurrent, Ycurrent], [Xnext, Ynext]),
-     is_covid_free([Xnext, Ynext]),
-     inside_map([Xnext, Ynext]),
-     not(member([Xnext, Ynext], Visited)),
-     find_way4([Xnext, Ynext], [Xfinish, Yfinish], [[Xcurrent, Ycurrent] | Visited], Path), !.
-
-
-
