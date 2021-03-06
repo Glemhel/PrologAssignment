@@ -8,8 +8,8 @@
 /**
  * map for the agent
  **/
-map_xlimit(9).
-map_ylimit(9).
+map_xlimit(5).
+map_ylimit(5).
 covid([0, 2]).
 covid([20, 0]).
 doctor([0, 5]).
@@ -37,8 +37,8 @@ is_adjacent([X1, Y1], [X2, Y2]) :-
 inside_map([X, Y]) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
-     X =< Xmax,
-     Y =< Ymax,
+     X < Xmax,
+     Y < Ymax,
      X >= 0,
      Y >= 0.
 
@@ -51,7 +51,10 @@ is_doctor_or_mask([X, Y], 1) :-
 is_doctor_or_mask([X, Y], 0) :-
      not(doctor([X, Y])), not(mask([X, Y])).
 
-find_way([Xcurrent, Ycurrent, Safety], [Xfinish, Yfinish], Visited, [[Xcurrent, Ycurrent] | Path]) :-
+dfs([Xfinish, Yfinish, _], [Xfinish, Yfinish], _, [[Xfinish, Yfinish]]) :-
+     true, !.
+
+dfs([Xcurrent, Ycurrent, Safety], [Xfinish, Yfinish], Visited, [[Xcurrent, Ycurrent] | Path]) :-
      (is_covid_free([Xcurrent, Ycurrent]); Safety = 1),
      get_adjacent([Xcurrent, Ycurrent], Adjacent_cells),
      member([Xnext, Ynext], Adjacent_cells),
@@ -60,18 +63,14 @@ find_way([Xcurrent, Ycurrent, Safety], [Xfinish, Yfinish], Visited, [[Xcurrent, 
      is_doctor_or_mask([Xcurrent, Ycurrent], Safety1),
      (
           ((Safety = 1; Safety1 = 1),
-          find_way([Xnext, Ynext, 1], [Xfinish, Yfinish], 
+          dfs([Xnext, Ynext, 1], [Xfinish, Yfinish], 
                [[Xcurrent, Ycurrent, 1] | Visited], Path), !
           );
           ((Safety = 0, Safety1 = 0),
-          find_way([Xnext, Ynext, 0], [Xfinish, Yfinish], 
+          dfs([Xnext, Ynext, 0], [Xfinish, Yfinish], 
                [[Xcurrent, Ycurrent, 0] | Visited], Path), !
           )
      ).
 
-
-find_way([Xfinish, Yfinish, _], [Xfinish, Yfinish], _, [[Xfinish, Yfinish]]) :-
-     true, !.
-
-find_way_to(X, Y, Path) :-
-     find_way([0, 0, 0], [X, Y], [], Path).
+find_way_dfs(X, Y, Path) :-
+     dfs([0, 0, 0], [X, Y], [], Path).
