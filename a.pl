@@ -15,23 +15,17 @@ covid([20, 0]).
 doctor([0, 5]).
 mask([110, 0]).
 
-get_adjacent([X, Y], L) :-
-     Yup is Y + 1,
-     Ydown is Y - 1,
-     Xup is X + 1,
-     Xdown is X - 1,
-     L = [[Xup, Y], [Xdown, Y], [X, Yup], [X, Ydown], [Xup, Yup],
-      [Xup, Ydown], [Xdown, Yup], [Xdown, Ydown]].
-
 is_adjacent([X1, Y1], [X2, Y2]) :-
-     X2 is X1 - 1, Y2 is Y1 - 1;
-     X2 is X1 - 1, Y2 is Y1;
-     X2 is X1 - 1, Y2 is Y1 + 1;
-     X2 is X1, Y2 is Y1 - 1;
-     X2 is X1, Y2 is Y1 + 1;
-     X2 is X1 + 1, Y2 is Y1 - 1;
+     X2 is X1 + 1, Y2 is Y1 + 1;
      X2 is X1 + 1, Y2 is Y1;
-     X2 is X1 + 1, Y2 is Y1 + 1.
+     X2 is X1, Y2 is Y1 + 1;
+     X2 is X1 - 1, Y2 is Y1 + 1;
+     X2 is X1 + 1, Y2 is Y1 - 1;
+     X2 is X1 - 1, Y2 is Y1;
+     X2 is X1, Y2 is Y1 - 1;
+     X2 is X1 - 1, Y2 is Y1 - 1.
+     
+     
 
 
 inside_map([X, Y]) :-
@@ -56,8 +50,7 @@ dfs([Xfinish, Yfinish, _], [Xfinish, Yfinish], _, [[Xfinish, Yfinish]]) :-
 
 dfs([Xcurrent, Ycurrent, Safety], [Xfinish, Yfinish], Visited, [[Xcurrent, Ycurrent] | Path]) :-
      (is_covid_free([Xcurrent, Ycurrent]); Safety = 1),
-     get_adjacent([Xcurrent, Ycurrent], Adjacent_cells),
-     member([Xnext, Ynext], Adjacent_cells),
+     is_adjacent([Xcurrent, Ycurrent], [Xnext, Ynext]),
      inside_map([Xnext, Ynext]),
      not(member([Xnext, Ynext, Safety], Visited)),
      is_doctor_or_mask([Xcurrent, Ycurrent], Safety1),
