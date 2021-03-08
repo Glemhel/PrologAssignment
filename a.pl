@@ -1,4 +1,4 @@
- :- set_prolog_flag(answer_write_options,
+:- set_prolog_flag(answer_write_options,
                    [ quoted(true),
                      portray(true),
                      spacing(next_argument)
@@ -10,15 +10,28 @@
  * 
  **/
 
+determine_safety(1, _, 1) :- !.
+determine_safety(_, 1, 1) :- !.
+determine_safety(0, 0, 0) :- !.
+
+get_dist(_, [], _) :-
+     print("bad"), false, !.
+
+get_dist((Xcurrent, Ycurrent, SafetyCurrent), [H | T], DistanceToCurrent) :-
+     H = (Xcurrent, Ycurrent, SafetyCurrent, DistanceToCurrent), !;
+     get_dist((Xcurrent, Ycurrent, SafetyCurrent), T, DistanceToCurrent).
+
 /**
  * map for the agent
  **/
-map_xlimit(4).
-map_ylimit(4).
-covid((2, 0)).
-%covid((3, -5)).
-doctor((2, 2)).
-mask((110, 0)).
+map_xlimit(9).
+map_ylimit(9).
+start((0, 0)).
+finish((5, 6)).
+covid((1, 4)).
+covid((6, 7)).
+doctor((7, 1)).
+mask((4, 4)).
 
 get_adjacent((X, Y), L) :-
      Yup is Y + 1,
@@ -67,9 +80,11 @@ is_doctor_or_mask(Position, 1) :-
 is_doctor_or_mask(Position, 0) :-
      not(doctor(Position)), not(mask(Position)).
 
-generate_path((Xfinish, Yfinish), (Xfinish, Yfinish), []) :- !.
+generate_path((XCurrent, YCurrent), []) :- 
+     finish((XCurrent, YCurrent)), !.
 
-generate_path((Xcurrent, Ycurrent), (Xfinish, Yfinish), [(Xnext, Ynext) | Path]) :- 
+generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :- 
+     finish((Xfinish, Yfinish)),
      (
      Xcurrent < Xfinish, Xnext is Xcurrent + 1;
      Xcurrent = Xfinish, Xnext = Xfinish;
@@ -80,27 +95,20 @@ generate_path((Xcurrent, Ycurrent), (Xfinish, Yfinish), [(Xnext, Ynext) | Path])
      Ycurrent = Yfinish, Ynext = Yfinish;
      Ycurrent > Yfinish, Ynext is Ycurrent - 1
      ), 
-     generate_path((Xnext, Ynext), (Xfinish, Yfinish), Path).
+     generate_path((Xnext, Ynext), Path).
 
-determine_safety(1, _, 1) :- !.
-determine_safety(_, 1, 1) :- !.
-determine_safety(0, 0, 0) :- !.
 
-get_dist(_, [], _) :-
-     print("bad"), false, !.
 
-get_dist((Xcurrent, Ycurrent, SafetyCurrent), [H | T], DistanceToCurrent) :-
-     H = (Xcurrent, Ycurrent, SafetyCurrent, DistanceToCurrent), !;
-     get_dist((Xcurrent, Ycurrent, SafetyCurrent), T, DistanceToCurrent).
-
-dfs((Xfinish, Yfinish, _), (Xfinish, Yfinish), _, [(Xfinish, Yfinish)]) :-
+dfs((Xcurrent, Ycurrent, _), _, [(Xcurrent, Ycurrent)]) :-
+     finish((Xcurrent, Ycurrent)),
      true.
 
 % heuristics : once with a mask, go straight to home
-dfs((Xcurrent, Ycurrent, 1), (Xfinish, Yfinish), _, [(Xcurrent, Ycurrent) | Path]) :-
-     generate_path((Xcurrent, Ycurrent), (Xfinish, Yfinish), Path), !.
+dfs((Xcurrent, Ycurrent, 1), _, [(Xcurrent, Ycurrent) | Path]) :-
+     finish((Xcurrent, Ycurrent)),
+     generate_path((Xcurrent, Ycurrent), Path), !.
 
-dfs((Xcurrent, Ycurrent, Safety), Destination, Visited, [(Xcurrent, Ycurrent) | Path]) :-
+dfs((Xcurrent, Ycurrent, Safety), Visited, [(Xcurrent, Ycurrent) | Path]) :-
      % heuristics starts
      % length(Path, Length), maximum_possible_steps(Max), Length < Max, 
      % heuristics ends
@@ -113,18 +121,13 @@ dfs((Xcurrent, Ycurrent, Safety), Destination, Visited, [(Xcurrent, Ycurrent) | 
      is_doctor_or_mask((Xcurrent, Ycurrent), Safety1),
      determine_safety(Safety, Safety1, Safe),
      (is_covid_free(NextPosition); Safe = 1),
-     dfs((Xnext, Ynext, Safe), Destination, 
-          [(Xcurrent, Ycurrent, Safe) | Visited], Path).
+     dfs((Xnext, Ynext, Safe), [(Xcurrent, Ycurrent, Safe) | Visited], Path).
 
-test(X) :-
-     X is 1.
+find_path_dfs(Path) :-
+     dfs((0, 0, 0), [(0, 0, 0)], Path).
 
-
-find_way_dfs(X, Y, Path) :-
-     dfs((0, 0, 0), (X, Y), [(0, 0, 0)], Path).
-
-min_path_dfs(X, Y, MinPath) :-
-     bagof(Path, find_way_dfs(X, Y, Path), L),
+min_path_dfs(MinPath) :-
+     bagof(Path, find_path_dfs(Path), L),
      lengths(L, Lengths, 0),
      min_member([_, Index], Lengths),
      nth0(Index, L, MinPath).
