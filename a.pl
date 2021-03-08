@@ -24,10 +24,10 @@ get_dist((Xcurrent, Ycurrent, SafetyCurrent), [H | T], DistanceToCurrent) :-
 /**
  * map for the agent
  **/
-map_xlimit(9).
-map_ylimit(9).
+map_xlimit(5).
+map_ylimit(5).
 start((0, 0)).
-finish((5, 6)).
+finish((3, 3)).
 covid((1, 4)).
 covid((6, 7)).
 doctor((7, 1)).
@@ -101,16 +101,15 @@ generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :-
 
 dfs((Xcurrent, Ycurrent, _), _, [(Xcurrent, Ycurrent)]) :-
      finish((Xcurrent, Ycurrent)),
-     true.
+     true, !.
 
 % heuristics : once with a mask, go straight to home
 dfs((Xcurrent, Ycurrent, 1), _, [(Xcurrent, Ycurrent) | Path]) :-
-     finish((Xcurrent, Ycurrent)),
      generate_path((Xcurrent, Ycurrent), Path), !.
 
 dfs((Xcurrent, Ycurrent, Safety), Visited, [(Xcurrent, Ycurrent) | Path]) :-
      % heuristics starts
-     % length(Path, Length), maximum_possible_steps(Max), Length < Max, 
+     length(Visited, Length), maximum_possible_steps(Max), Length < Max, 
      % heuristics ends
      CurrentPosition = (Xcurrent, Ycurrent),
      NextPosition = (Xnext, Ynext),
