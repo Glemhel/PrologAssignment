@@ -42,14 +42,8 @@ get_adjacent((X, Y), L) :-
           (Xdown, Ydown)].
 
 is_adjacent((X1, Y1), (X2, Y2)) :-
-     X2 is X1 + 1, Y2 is Y1 + 1;
-     X2 is X1 + 1, Y2 is Y1;
-     X2 is X1, Y2 is Y1 + 1;
-     X2 is X1 - 1, Y2 is Y1 + 1;
-     X2 is X1 + 1, Y2 is Y1 - 1;
-     X2 is X1 - 1, Y2 is Y1;
-     X2 is X1, Y2 is Y1 - 1;
-     X2 is X1 - 1, Y2 is Y1 - 1.
+     get_adjacent((X1, Y1), L),
+     member((X2, Y2), L).
 
 inside_map((X, Y)) :-
      map_xlimit(Xmax),
