@@ -10,17 +10,6 @@
  * 
  **/
 
-determine_safety(1, _, 1) :- !.
-determine_safety(_, 1, 1) :- !.
-determine_safety(0, 0, 0) :- !.
-
-get_dist(_, [], _) :-
-     print("bad"), false, !.
-
-get_dist((Xcurrent, Ycurrent, SafetyCurrent), [H | T], DistanceToCurrent) :-
-     H = (Xcurrent, Ycurrent, SafetyCurrent, DistanceToCurrent), !;
-     get_dist((Xcurrent, Ycurrent, SafetyCurrent), T, DistanceToCurrent).
-
 /**
  * map for the agent
  **/
@@ -32,6 +21,11 @@ covid((1, 4)).
 covid((6, 7)).
 doctor((7, 1)).
 mask((4, 4)).
+
+
+/**
+ * General purpose functions
+ **/
 
 get_adjacent((X, Y), L) :-
      Yup is Y + 1,
@@ -53,6 +47,28 @@ inside_map((X, Y)) :-
      X >= 0,
      Y >= 0.
 
+
+is_covid_free(Position) :-
+     forall(is_adjacent(Position, Cell), not(covid(Cell))).
+
+is_doctor_or_mask(Position, 1) :-
+     doctor(Position); mask(Position).
+
+is_doctor_or_mask(Position, 0) :-
+     not(doctor(Position)), not(mask(Position)).
+
+determine_safety(1, _, 1) :- !.
+determine_safety(_, 1, 1) :- !.
+determine_safety(0, 0, 0) :- !.
+
+get_dist(_, [], _) :-
+     print("bad"), false, !.
+
+get_dist((Xcurrent, Ycurrent, SafetyCurrent), [H | T], DistanceToCurrent) :-
+     H = (Xcurrent, Ycurrent, SafetyCurrent, DistanceToCurrent), !;
+     get_dist((Xcurrent, Ycurrent, SafetyCurrent), T, DistanceToCurrent).
+
+
 lengths([], [], _) :-!.
 lengths([H | T], [[LenH, Ind] | T1], Ind) :-
      Ind1 is Ind + 1,
@@ -64,15 +80,9 @@ maximum_possible_steps(D) :-
      map_ylimit(Ymax),
      D is 2 * max(Xmax, Ymax) + 2.
 
-
-is_covid_free(Position) :-
-     forall(is_adjacent(Position, Cell), not(covid(Cell))).
-
-is_doctor_or_mask(Position, 1) :-
-     doctor(Position); mask(Position).
-
-is_doctor_or_mask(Position, 0) :-
-     not(doctor(Position)), not(mask(Position)).
+/**
+ * Backtracking Functionality
+ **/
 
 generate_path((XCurrent, YCurrent), []) :- 
      finish((XCurrent, YCurrent)), !.
@@ -90,8 +100,6 @@ generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :-
      Ycurrent > Yfinish, Ynext is Ycurrent - 1
      ), 
      generate_path((Xnext, Ynext), Path).
-
-
 
 dfs((Xcurrent, Ycurrent, _), _, [(Xcurrent, Ycurrent)]) :-
      finish((Xcurrent, Ycurrent)),
@@ -124,6 +132,11 @@ min_path_dfs(MinPath) :-
      lengths(L, Lengths, 0),
      min_member([_, Index], Lengths),
      nth0(Index, L, MinPath).
+
+
+/**
+ * A* Functionality
+ **/
 
 % astar((Xfinish, Yfinish), VerticesHeap, VisitedList) :-
 %      get_from_heap(VerticesHeap, Distance, [Xfinish, Yfinish, _], VerticesHeap1).
