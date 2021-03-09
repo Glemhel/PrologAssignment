@@ -14,6 +14,9 @@ firstN(N,Pred) :-
 
 findN(N,Term,Pred,List) :-
     findall(Term,firstN(N,Pred),List).
+
+:- dynamic min_path_length/1.
+min_path_length(1000).
 /**
  * Mikhail Rudakov
  * BS19-02
@@ -102,6 +105,19 @@ maximum_possible_steps(D) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
      D is 2 * max(Xmax, Ymax) + 2.
+
+heuristics_shortest_path_set(Path) :-
+     min_path_length(MinLength),
+     length(Path, Length),
+     Length < MinLength,
+     assertz(min_path_length(Length)),
+     retract(min_path_length(MinLength)), !.
+
+heuristics_shortest_path_check(Path) :-
+     min_path_length(MinLength),
+     length(Path, Length),
+     Length < MinLength, !.
+
 % </Helper functions>
 
 generate_path((Xcurrent, Ycurrent), []) :- 
@@ -121,17 +137,23 @@ generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :-
      ), 
      generate_path((Xnext, Ynext), Path).
 
-dfs((Xcurrent, Ycurrent, _), _, [(Xcurrent, Ycurrent)]) :-
+dfs((Xcurrent, Ycurrent, _), Visited, [(Xcurrent, Ycurrent)]) :-
      finish((Xcurrent, Ycurrent)),
-     true, !.
+     %heuristics - memorize shortest path's length
+     heuristics_shortest_path_set(Visited),
+     !.
 
 % heuristics : once with a mask, go straight to home
-dfs((Xcurrent, Ycurrent, 1), _, [(Xcurrent, Ycurrent) | Path]) :-
-     generate_path((Xcurrent, Ycurrent), Path), !.
+dfs((Xcurrent, Ycurrent, 1), Visited, [(Xcurrent, Ycurrent) | Path]) :-
+     generate_path((Xcurrent, Ycurrent), Path), 
+     %heuristics - memorize shortest path's length
+     append(Visited, Path, PathHome),
+     heuristics_shortest_path_set(PathHome),
+     !.
 
 dfs((Xcurrent, Ycurrent, Safety), Visited, [(Xcurrent, Ycurrent) | Path]) :-
      % heuristics starts
-     length(Visited, Length), maximum_possible_steps(Max), Length < Max, 
+     heuristics_shortest_path_check(Visited),
      % heuristics ends
      CurrentPosition = (Xcurrent, Ycurrent),
      NextPosition = (Xnext, Ynext),
@@ -199,8 +221,6 @@ create_array(I, J, K, Value, [Array | T]) :-
      I1 is I - 1,
      create_array(J, K, Value, Array),
      create_array(I1, J, K, Value, T).
-     
-
 
 nth0_2d(J, K, Array, Value) :-
      nth0(J, Array, Row),
@@ -209,9 +229,6 @@ nth0_2d(J, K, Array, Value) :-
 nth0_3d(I, J, K, Array, Value) :-
      nth0(I, Array, Row),
      nth0_2d(J, K, Row, Value).
-
-
-
 
 process_neighbours([], _, _, _, Distances, Predecessors, VerticesHeap, Distances, Predecessors, VerticesHeap) :- !.
 process_neighbours([(Xcurrent, Ycurrent) | T], Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
@@ -265,7 +282,7 @@ astar(VerticesHeap, Distances, Predecessors, PathHome) :-
      astar(VerticesHeapNew, DistancesNew, PredecessorsNew, PathHome).
      
 
-find_path_astar(PathHome) :-
+min_path_astar(PathHome) :-
      empty_heap(Heap),
      start((Xstart, Ystart)),
      add_to_heap(Heap, 0, (Xstart, Ystart, 0), VerticesHeap),
