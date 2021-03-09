@@ -24,14 +24,18 @@ findN(N,Term,Pred,List) :-
 /**
  * map for the agent
  **/
-map_xlimit(2).
-map_ylimit(2).
+map_xlimit(9).
+map_ylimit(9).
 start((0, 0)).
-finish((1, 1)).
-covid((1, 4)).
-covid((6, 7)).
-doctor((7, 1)).
-mask((4, 4)).
+finish((7, 7)).
+covid((1, 2)).
+covid((1, 5)).
+covid((1, 6)).
+covid((5, 1)).
+covid((5, 4)).
+covid((5, 7)).
+doctor((8, 8)).
+mask((0, 8)).
 
 infinity(1000).
 
@@ -64,8 +68,9 @@ inside_map((X, Y)) :-
 is_covid_free(Position) :-
      forall(is_adjacent(Position, Cell), not(covid(Cell))).
 
-is_covid_free(Safety, Position) :-
-     Safety = 1, !;
+is_covid_free(1, _) :- !.
+
+is_covid_free(0, Position) :-
      is_covid_free(Position).
 
 is_doctor_or_mask(Position, 1) :-
@@ -99,8 +104,8 @@ maximum_possible_steps(D) :-
      D is 2 * max(Xmax, Ymax) + 2.
 % </Helper functions>
 
-generate_path((XCurrent, YCurrent), []) :- 
-     finish((XCurrent, YCurrent)), !.
+generate_path((Xcurrent, Ycurrent), []) :- 
+     finish((Xcurrent, Ycurrent)), !.
 
 generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :- 
      finish((Xfinish, Yfinish)),
@@ -213,35 +218,35 @@ process_neighbours([(Xcurrent, Ycurrent) | T], Safety, DistanceToCurrent, (Xpred
                     Distances, Predecessors, VerticesHeap, DistancesNew, PredecessorsNew, VerticesHeapNew) :- 
      (
           nth0_3d(Xcurrent, Ycurrent, Safety, Distances, DistanceOld),
-          DistanceToCurrent < DistanceOld
-          ->
+          DistanceToCurrent < DistanceOld,
           (
           heuristic_distance((Xcurrent, Ycurrent), Heuristics),
           Priority is DistanceToCurrent + Heuristics,
           update_value(Xcurrent, Ycurrent, Safety, DistanceToCurrent, Distances, DistancesUpd),
           update_value(Xcurrent, Ycurrent, Safety, (Xpred, Ypred, Spred), Predecessors, PredecessorsUpd),
           add_to_heap(VerticesHeap, Priority, (Xcurrent, Ycurrent, Safety), VerticesHeapUpd) 
-          )
+          ),
+          !
           ;
           DistancesUpd = Distances, PredecessorsUpd = Predecessors, VerticesHeapUpd = VerticesHeap
      ),
-     process_neighbours([T], Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
+     process_neighbours(T, Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
                DistancesUpd, PredecessorsUpd, VerticesHeapUpd, DistancesNew, PredecessorsNew, VerticesHeapNew).
 
 
 
-build_path((X, Y, _), _, []) :- 
+build_path((X, Y, _), _, [(X, Y)]) :- 
      start((X, Y)),
      !.
 
 build_path((X, Y, S), Predecessors, PathHome) :- 
-     nth0_3d(X, Y, S, Predecessors, Pred),
-     build_path(Pred, Predecessors, PathHomeHead),
-     append(PathHomeHead, Pred, PathHome).
+     nth0_3d(X, Y, S, Predecessors, (Xpred, Ypred, Spred)),
+     build_path((Xpred, Ypred, Spred), Predecessors, PathHomeHead),
+     append(PathHomeHead, [(X, Y)], PathHome).
 
 astar(VerticesHeap, _, Predecessors, PathHome) :-
      finish((Xfinish, Yfinish)),
-     min_of_heap(VerticesHeap, _, [Xfinish, Yfinish, SafetyFinish]),
+     min_of_heap(VerticesHeap, _, (Xfinish, Yfinish, SafetyFinish)),
      build_path((Xfinish, Yfinish, SafetyFinish), Predecessors, PathHome),
      !.
 
@@ -260,11 +265,13 @@ astar(VerticesHeap, Distances, Predecessors, PathHome) :-
      astar(VerticesHeapNew, DistancesNew, PredecessorsNew, PathHome).
      
 
-find_way_astar(PathHome) :-
+find_path_astar(PathHome) :-
      empty_heap(Heap),
      start((Xstart, Ystart)),
      add_to_heap(Heap, 0, (Xstart, Ystart, 0), VerticesHeap),
      map_xlimit(Xmax), map_ylimit(Ymax), infinity(Inf),
      create_array(Xmax, Ymax, 2, Inf, Distances),
+     update_value(Xstart, Ystart, 0, 0, Distances, Distances1),
      create_array(Xmax, Ymax, 2, -1, Predecessors),
-     astar(VerticesHeap, Distances, Predecessors, PathHome).
+     bagof(Path, astar(VerticesHeap, Distances1, Predecessors, Path), L),
+     nth0(0, L, PathHome).
