@@ -16,7 +16,7 @@ findN(N,Term,Pred,List) :-
     findall(Term,firstN(N,Pred),List).
 
 :- dynamic min_path_length/1.
-min_path_length(1000).
+
 /**
  * Mikhail Rudakov
  * BS19-02
@@ -27,18 +27,14 @@ min_path_length(1000).
 /**
  * map for the agent
  **/
-map_xlimit(9).
-map_ylimit(9).
+map_xlimit(7).
+map_ylimit(7).
 start((0, 0)).
-finish((7, 7)).
-covid((1, 2)).
-covid((1, 5)).
-covid((1, 6)).
-covid((5, 1)).
-covid((5, 4)).
-covid((5, 7)).
-doctor((8, 8)).
-mask((0, 8)).
+finish((6, 0)).
+covid((6, 2)).
+covid((5, 2)).
+doctor((66, 8)).
+mask((16, 4)).
 
 infinity(1000).
 
@@ -46,6 +42,11 @@ infinity(1000).
 /**
  * General purpose functions
  **/
+
+output_results(Path, Length, ExecutionTime) :-
+     write('Minimum path is: '), nl, write(Path), nl,
+     write('Length: '), write(Length), nl,
+     write('Execution time: '), write(ExecutionTime), write(' ms.'), nl.
 
 get_adjacent((X, Y), L) :-
      Yup is Y + 1,
@@ -76,17 +77,8 @@ is_covid_free(1, _) :- !.
 is_covid_free(0, Position) :-
      is_covid_free(Position).
 
-is_doctor_or_mask(Position, 1) :-
+is_doctor_or_mask(Position) :-
      doctor(Position); mask(Position).
-
-is_doctor_or_mask(Position, 0) :-
-     not(doctor(Position)), not(mask(Position)).
-
-determine_safety(1, _, 1) :- !.
-determine_safety(_, 1, 1) :- !.
-determine_safety(0, 0, 0) :- !.
-
-
 
 
 /**
@@ -94,17 +86,10 @@ determine_safety(0, 0, 0) :- !.
  **/
 
 % <Helper functions>
-
-lengths([], [], _) :-!.
-lengths([H | T], [[LenH, Ind] | T1], Ind) :-
-     Ind1 is Ind + 1,
-     length(H, LenH),
-     lengths(T, T1, Ind1).
-
 maximum_possible_steps(D) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
-     D is 2 * max(Xmax, Ymax) + 2.
+     D is 3 * max(Xmax, Ymax).
 
 heuristics_shortest_path_set(Path) :-
      min_path_length(MinLength),
@@ -120,8 +105,8 @@ heuristics_shortest_path_check(Path) :-
 
 % </Helper functions>
 
-generate_path((Xcurrent, Ycurrent), []) :- 
-     finish((Xcurrent, Ycurrent)), !.
+generate_path(CurrentPosition, []) :- 
+     finish(CurrentPosition), !.
 
 generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :- 
      finish((Xfinish, Yfinish)),
@@ -137,47 +122,44 @@ generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :-
      ), 
      generate_path((Xnext, Ynext), Path).
 
-dfs((Xcurrent, Ycurrent, _), Visited, [(Xcurrent, Ycurrent)]) :-
-     finish((Xcurrent, Ycurrent)),
-     %heuristics - memorize shortest path's length
+dfs(CurrentPosition, Visited, [CurrentPosition]) :-
+     finish(CurrentPosition),
      heuristics_shortest_path_set(Visited),
      !.
 
-% heuristics : once with a mask, go straight to home
-dfs((Xcurrent, Ycurrent, 1), Visited, [(Xcurrent, Ycurrent) | Path]) :-
-     generate_path((Xcurrent, Ycurrent), Path), 
-     %heuristics - memorize shortest path's length
+dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
+     is_doctor_or_mask(CurrentPosition),
+     generate_path(CurrentPosition, Path), 
      append(Visited, Path, PathHome),
      heuristics_shortest_path_set(PathHome),
      !.
 
-dfs((Xcurrent, Ycurrent, Safety), Visited, [(Xcurrent, Ycurrent) | Path]) :-
-     % heuristics starts
+dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
      heuristics_shortest_path_check(Visited),
-     % heuristics ends
-     CurrentPosition = (Xcurrent, Ycurrent),
-     NextPosition = (Xnext, Ynext),
-     (is_covid_free(CurrentPosition); Safety = 1),
+     is_covid_free(CurrentPosition),
      is_adjacent(CurrentPosition, NextPosition),
      inside_map(NextPosition),
-     not(member((Xnext, Ynext, Safety), Visited)),
-     is_doctor_or_mask((Xcurrent, Ycurrent), Safety1),
-     determine_safety(Safety, Safety1, Safe),
-     (is_covid_free(NextPosition); Safe = 1),
-     dfs((Xnext, Ynext, Safe), [(Xcurrent, Ycurrent, Safe) | Visited], Path).
+     not(member(NextPosition, Visited)),
+     dfs(NextPosition, [CurrentPosition | Visited], Path).
 
 find_path_dfs(Path) :-
-     dfs((0, 0, 0), [(0, 0, 0)], Path).
+     start(Start),
+     dfs(Start, [Start], Path).
 
-min_path_dfs(MinPath) :-
+min_path_dfs(MinPath) :-    
      bagof(Path, find_path_dfs(Path), L),
-     lengths(L, Lengths, 0),
-     min_member([_, Index], Lengths),
-     nth0(Index, L, MinPath).
+     last(L, MinPath).
 
-main() :-
-     min_path_dfs(MinPath),
-     print(MinPath).
+dfs() :-
+     retractall(min_path_length(_)),
+     maximum_possible_steps(X),
+     assertz(min_path_length(X)),
+     statistics(walltime, _),
+     min_path_dfs(Path),
+     statistics(walltime, [_ | [ExecutionTime]]),
+     length(Path, Length),
+     output_results(Path, Length, ExecutionTime),
+     retractall(min_path_length(_)).
 
 /**
  * A* Functionality
@@ -292,3 +274,13 @@ min_path_astar(PathHome) :-
      create_array(Xmax, Ymax, 2, -1, Predecessors),
      bagof(Path, astar(VerticesHeap, Distances1, Predecessors, Path), L),
      nth0(0, L, PathHome).
+
+astar() :-
+     statistics(walltime, _),
+     min_path_astar(Path),
+     statistics(walltime, [_ | [ExecutionTime]]),
+     length(Path, Length),
+     output_results(Path, Length, ExecutionTime).
+
+% Testing function
+
