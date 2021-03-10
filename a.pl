@@ -27,14 +27,14 @@ findN(N,Term,Pred,List) :-
 /**
  * map for the agent
  **/
-map_xlimit(7).
-map_ylimit(7).
+map_xlimit(9).
+map_ylimit(9).
 start((0, 0)).
 finish((6, 0)).
-covid((6, 2)).
-covid((5, 2)).
-doctor((66, 8)).
-mask((16, 4)).
+covid((6, 1)).
+covid((6, 3)).
+doctor((6, 8)).
+mask((1, 4)).
 
 infinity(1000).
 
@@ -48,6 +48,10 @@ output_results(Path, Length, ExecutionTime) :-
      write('Length: '), write(Length), nl,
      write('Execution time: '), write(ExecutionTime), write(' ms.'), nl.
 
+compute_distances([], []) :- !.
+compute_distances([H | T], [[D, H] | T1]) :-
+     chessboard_distance(H, D), compute_distances(T, T1).
+
 get_adjacent((X, Y), L) :-
      Yup is Y + 1,
      Ydown is Y - 1,
@@ -56,18 +60,38 @@ get_adjacent((X, Y), L) :-
      L = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
           (Xdown, Ydown)].
 
-is_adjacent((X1, Y1), (X2, Y2)) :-
-     get_adjacent((X1, Y1), L),
-     member((X2, Y2), L).
+is_adjacent(P1, P2) :-
+     get_adjacent(P1, L),
+     member(P2, L).
+
+get_second([], []) :- !.
+
+get_second([[_, Hb] | T], [Hb | T1]) :-
+     get_second(T, T1).
+
+get_adjacent_heuristic((X, Y), Lheuristic) :-
+     Yup is Y + 1,
+     Ydown is Y - 1,
+     Xup is X + 1,
+     Xdown is X - 1,
+     L0 = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
+          (Xdown, Ydown)],
+     compute_distances(L0, L1),
+     sort(L1, L2),
+     get_second(L2, Lheuristic).
+
+is_adjacent_heuristic(P1, P2) :-
+     get_adjacent_heuristic(P1, L),
+     member(P2, L).
 
 inside_map((X, Y)) :-
-     map_xlimit(Xmax),
-     map_ylimit(Ymax),
-     X < Xmax,
-     Y < Ymax,
      X >= 0,
-     Y >= 0.
-
+     Y >= 0,
+     map_xlimit(Xmax),
+     X < Xmax,
+     map_ylimit(Ymax),
+     Y < Ymax.
+ 
 
 is_covid_free(Position) :-
      forall(is_adjacent(Position, Cell), not(covid(Cell))).
@@ -80,6 +104,14 @@ is_covid_free(0, Position) :-
 is_doctor_or_mask(Position) :-
      doctor(Position); mask(Position).
 
+is_doctor_or_mask(Position, 0) :-
+     not(doctor(Position)), not(mask(Position)).
+
+is_doctor_or_mask(Position, 1) :-
+     doctor(Position); mask(Position).
+
+
+
 
 /**
  * Backtracking Functionality
@@ -89,7 +121,7 @@ is_doctor_or_mask(Position) :-
 maximum_possible_steps(D) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
-     D is 3 * max(Xmax, Ymax).
+     D is 4 * max(Xmax, Ymax).
 
 heuristics_shortest_path_set(Path) :-
      min_path_length(MinLength),
@@ -137,7 +169,7 @@ dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
 dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
      heuristics_shortest_path_check(Visited),
      is_covid_free(CurrentPosition),
-     is_adjacent(CurrentPosition, NextPosition),
+     is_adjacent_heuristic(CurrentPosition, NextPosition),
      inside_map(NextPosition),
      not(member(NextPosition, Visited)),
      dfs(NextPosition, [CurrentPosition | Visited], Path).
@@ -165,7 +197,11 @@ dfs() :-
  * A* Functionality
  **/
 
-heuristic_distance((X, Y), Distance) :-
+determine_safety(1, _, 1) :- !.
+determine_safety(_, 1, 1) :- !.
+determine_safety(0, 0, 0) :- !.
+
+chessboard_distance((X, Y), Distance) :-
      finish((Xfinish, Yfinish)),
      Distance is max(abs(X - Xfinish), abs(Y - Yfinish)).
 
@@ -219,7 +255,7 @@ process_neighbours([(Xcurrent, Ycurrent) | T], Safety, DistanceToCurrent, (Xpred
           nth0_3d(Xcurrent, Ycurrent, Safety, Distances, DistanceOld),
           DistanceToCurrent < DistanceOld,
           (
-          heuristic_distance((Xcurrent, Ycurrent), Heuristics),
+          chessboard_distance((Xcurrent, Ycurrent), Heuristics),
           Priority is DistanceToCurrent + Heuristics,
           update_value(Xcurrent, Ycurrent, Safety, DistanceToCurrent, Distances, DistancesUpd),
           update_value(Xcurrent, Ycurrent, Safety, (Xpred, Ypred, Spred), Predecessors, PredecessorsUpd),
