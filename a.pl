@@ -42,10 +42,26 @@ infinity(1000).
  * General purpose functions
  **/
 
-output_results(Path, Length, ExecutionTime) :-
+convert_time(ExecutionTime, Minutes, Seconds, MilliSeconds) :-
+     Minutes is ExecutionTime // 60000, Seconds is ExecutionTime // 1000 mod 60, MilliSeconds is ExecutionTime mod 1000.
+
+output_results([], ExecutionTime) :-
+     convert_time(ExecutionTime, M, S, Ms),
+     write('Result: lose'), nl,
+     write('Execution time: '), write(M), write(' min. '), 
+     write(S), write(' sec. '), write(Ms), write(' ms.'),  
+     nl, !.
+
+output_results(Path, ExecutionTime) :-
+     convert_time(ExecutionTime, M, S, Ms),
+     write('Path on the map:'), nl,
+     draw_map(Path),
+     write('Result: win'), nl, 
      write('Shortest path is: '), nl, write(Path), nl,
+     length(Path, Length),
      write('Length: '), write(Length), nl,
-     write('Execution time: '), write(ExecutionTime), write(' ms.'), nl.
+     write('Execution time: '), write(M), write(' min. '), 
+     write(S), write(' sec. '), write(Ms), write(' ms.').
 
 compute_distances([], []) :- !.
 compute_distances([H | T], [[D, H] | T1]) :-
@@ -60,6 +76,12 @@ get_adjacent((X, Y), L) :-
           (Xdown, Ydown)].
 
 is_adjacent(P1, P2) :-
+     get_adjacent(P1, L),
+     member(P2, L).
+
+
+is_adjacent_or_equal(P1, P2) :-
+     P1 = P2;
      get_adjacent(P1, L),
      member(P2, L).
 
@@ -120,7 +142,7 @@ is_doctor_or_mask(Position, 1) :-
 maximum_possible_steps(D) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
-     D is 2 * max(Xmax, Ymax).
+     D is 3 * max(Xmax, Ymax).
      %D is 12.
 
 heuristics_shortest_path_set(Path) :-
@@ -168,15 +190,16 @@ dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
 
 dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
      heuristics_shortest_path_check(Visited),
-     is_covid_free(CurrentPosition),
      is_adjacent_heuristic(CurrentPosition, NextPosition),
      inside_map(NextPosition),
      not(member(NextPosition, Visited)),
-     dfs(NextPosition, [CurrentPosition | Visited], Path).
+     is_covid_free(NextPosition),
+     dfs(NextPosition, [NextPosition | Visited], Path).
 
 find_path_dfs(Path) :-
      start(Start),
-     dfs(Start, [], Path).
+     finish(Home), inside_map(Home),
+     dfs(Start, [Start], Path).
 
 min_path_dfs(MinPath) :-    
      bagof(Path, find_path_dfs(Path), L),
@@ -188,10 +211,9 @@ dfs() :-
      maximum_possible_steps(X),
      assertz(min_path_length(X)),
      statistics(walltime, _),
-     min_path_dfs(Path),
+     (min_path_dfs(Path), !; Path = []),
      statistics(walltime, [_ | [ExecutionTime]]),
-     length(Path, Length),
-     output_results(Path, Length, ExecutionTime),
+     output_results(Path, ExecutionTime),
      retractall(min_path_length(_)).
 
 /**
@@ -320,10 +342,9 @@ min_path_astar(PathHome) :-
 astar() :-
      write('A* algorithm: '), nl,
      statistics(walltime, _),
-     min_path_astar(Path),
+     (min_path_astar(Path), !; Path = []),
      statistics(walltime, [_ | [ExecutionTime]]),
-     length(Path, Length),
-     output_results(Path, Length, ExecutionTime).
+     output_results(Path, ExecutionTime).
 
 % Testing function and maps test cases
 
@@ -337,8 +358,16 @@ reset_environment() :-
      retractall(doctor(_)),
      retractall(mask(_)).
 
+get_environment(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid) :-
+     map_xlimit(Xlimit), map_ylimit(Ylimit), 
+     bagof(Xa, start(Xa), Actor), 
+     bagof(Xb, finish(Xb), Home), 
+     bagof(Xc, doctor(Xc), Doctor), 
+     bagof(Xd, mask(Xd), Mask), 
+     bagof(Xe, covid(Xe), Covid),
+     !. 
 
-set_environment(1) :-
+set_environment(t1) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -346,10 +375,10 @@ set_environment(1) :-
      assertz(covid((1, 4))),
      assertz(covid((6, 7))),
      assertz(doctor((4, 4))),
-     assertz(mask((7, 1))).
+     assertz(mask((7, 1))), !.
 
 
-set_environment(2) :-
+set_environment(t2) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -357,9 +386,9 @@ set_environment(2) :-
      assertz(covid((3, 7))),
      assertz(covid((2, 3))),
      assertz(doctor((5, 1))),
-     assertz(mask((1, 5))).
+     assertz(mask((1, 5))), !.
 
-set_environment(3) :-
+set_environment(t3) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -367,9 +396,19 @@ set_environment(3) :-
      assertz(covid((6, 3))),
      assertz(covid((6, 1))),
      assertz(doctor((6, 8))),
-     assertz(mask((1, 4))).
+     assertz(mask((1, 4))), !.
 
-set_environment(small) :-
+set_environment(t4) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((0, 5))),
+     assertz(covid((1, 3))),
+     assertz(covid((4, 0))),
+     assertz(doctor((3, 3))),
+     assertz(mask((6, 1))), !.
+
+set_environment(tsmall) :-
      assertz(map_xlimit(4)),
      assertz(map_ylimit(4)),
      assertz(start((0, 0))),
@@ -377,7 +416,74 @@ set_environment(small) :-
      assertz(covid((3, 0))),
      assertz(covid((3, 3))),
      assertz(doctor((0, 2))),
-     assertz(mask((0, 1))).
+     assertz(mask((0, 1))), !.
+
+set_environment(tsmall_lose) :-
+     assertz(map_xlimit(4)),
+     assertz(map_ylimit(4)),
+     assertz(start((0, 0))),
+     assertz(finish((3, 1))),
+     assertz(covid((3, 0))),
+     assertz(covid((3, 3))),
+     assertz(doctor((0, 21))),
+     assertz(mask((0, 11))), !.
+
+set_environment(tlose) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((8, 0))),
+     assertz(covid((2, 1))),
+     assertz(covid((0, 3))),
+     assertz(doctor((0, 4))),
+     assertz(mask((3, 7))), !.
+
+set_environment(ttest) :-
+     assertz(map_xlimit(6)),
+     assertz(map_ylimit(6)),
+     assertz(start((0, 0))),
+     assertz(finish((4, 0))),
+     assertz(covid((2, 0))),
+     assertz(covid((2, 3))),
+     assertz(doctor((1, 2))),
+     assertz(mask((2, 1))), !.
+
+set_environment(N1) :-
+     (
+     N1 < 10, N is N1 - 1,
+     Xstart = 0, Ystart = 0,
+     random_between(0, N, Xfinish), random_between(0, N, Yfinish),
+     random_between(0, N, Xmask), random_between(0, N, Ymask),
+     random_between(0, N, Xdoc), random_between(0, N, Ydoc),
+     random_between(0, N, Xcov1), random_between(0, N, Ycov1),
+     random_between(0, N, Xcov2), random_between(0, N, Ycov2),
+     unique([(Xfinish, Yfinish), (Xmask, Ymask), (Xdoc, Ydoc), (Xcov1, Ycov1), (Xcov2, Ycov2), 
+               (Xstart, Ystart) ]),
+
+     not(is_adjacent_or_equal((Xstart, Ystart), (Xcov1, Ycov1))),
+     not(is_adjacent_or_equal((Xstart, Ystart), (Xcov2, Ycov2))),
+
+     not(is_adjacent_or_equal((Xmask, Ymask), (Xcov1, Ycov1))),
+     not(is_adjacent_or_equal((Xmask, Ymask), (Xcov2, Ycov2))),
+   
+     not(is_adjacent_or_equal((Xdoc, Ydoc), (Xcov1, Ycov1))),
+     not(is_adjacent_or_equal((Xdoc, Ydoc), (Xcov2, Ycov2))),
+
+     assertz(map_xlimit(N1)),
+     assertz(map_ylimit(N1)),
+     assertz(start((Xstart, Ystart))),
+     assertz(finish((Xfinish, Yfinish))),
+     assertz(covid((Xcov1, Ycov1))),
+     assertz(covid((Xcov2, Ycov2))),
+     assertz(doctor((Xdoc, Ydoc))),
+     assertz(mask((Xmask, Ymask))), !
+     ) ;
+     set_environment(N1).
+
+unique([]) :- !.
+unique([H | T]) :-
+     not(member(H, T)), 
+     unique(T).
 
 
 print_array([]) :- !.
@@ -407,40 +513,53 @@ change_coordinates(Xlimit, Ylimit, [(X, Y) | T], [(X1, Y1) | T1]) :-
      Y1 is X, X1 is Ylimit - Y - 1,
      change_coordinates(Xlimit, Ylimit, T, T1).
 
-draw_map(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid) :-
+draw_map(Path) :-
+     get_environment(Xlimit, Ylimit, Actor0, Home0, Doctor0, Mask0, Covid0),
      create_array(Xlimit, Ylimit, '.', Map),
-     include(inside_map, Actor, Actor1), update_values(Actor1, 'A', Map, Map1),
-     include(inside_map, Home, Home1), update_values(Home1, 'H', Map1, Map2),
-     include(inside_map, Doctor, Doctor1), update_values(Doctor1, 'D', Map2, Map3),
-     include(inside_map, Mask, Mask1), update_values(Mask1, 'M', Map3, Map4),
-     include(inside_map, Covid, Covid1), update_values(Covid1, 'C', Map4, MapFinal),
+     change_coordinates(Xlimit, Ylimit, Actor0, Actor1),
+     change_coordinates(Xlimit, Ylimit, Home0, Home1),
+     change_coordinates(Xlimit, Ylimit, Doctor0, Doctor1),
+     change_coordinates(Xlimit, Ylimit, Mask0, Mask1),
+     change_coordinates(Xlimit, Ylimit, Covid0, Covid1),
+     change_coordinates(Xlimit, Ylimit, Path, Path1),
+     include(inside_map, Actor1, Actor2), update_values(Actor2, 'A', Map, Map1),
+     include(inside_map, Home1, Home2), update_values(Home2, 'H', Map1, Map2),
+     include(inside_map, Doctor1, Doctor2), update_values(Doctor2, 'D', Map2, Map3),
+     include(inside_map, Mask1, Mask2), update_values(Mask2, 'M', Map3, Map4),
+     include(inside_map, Covid1, Covid2), update_values(Covid2, 'C', Map4, Map5),
+     update_values(Path1, 'o', Map5, MapFinal),
+     print_array_2d(Xlimit, MapFinal).
+
+draw_map() :-
+     get_environment(Xlimit, Ylimit, Actor0, Home0, Doctor0, Mask0, Covid0),
+     create_array(Xlimit, Ylimit, '.', Map),
+     change_coordinates(Xlimit, Ylimit, Actor0, Actor1),
+     change_coordinates(Xlimit, Ylimit, Home0, Home1),
+     change_coordinates(Xlimit, Ylimit, Doctor0, Doctor1),
+     change_coordinates(Xlimit, Ylimit, Mask0, Mask1),
+     change_coordinates(Xlimit, Ylimit, Covid0, Covid1),
+     include(inside_map, Actor1, Actor2), update_values(Actor2, 'A', Map, Map1),
+     include(inside_map, Home1, Home2), update_values(Home2, 'H', Map1, Map2),
+     include(inside_map, Doctor1, Doctor2), update_values(Doctor2, 'D', Map2, Map3),
+     include(inside_map, Mask1, Mask2), update_values(Mask2, 'M', Map3, Map4),
+     include(inside_map, Covid1, Covid2), update_values(Covid2, 'C', Map4, MapFinal),
      print_array_2d(Xlimit, MapFinal).
 
 
 test(X) :-
      write('========= START OF TEST CASE ========='),
-     write('Running on example map #'), write(X), write(':'), nl, nl,
+     write('Running on map '), write(X), write(':'), nl, nl,
      reset_environment(), set_environment(X),
-     map_xlimit(Xlimit), map_ylimit(Ylimit), 
-     bagof(Xa, start(Xa), Actor), 
-     bagof(Xb, finish(Xb), Home), 
-     bagof(Xc, doctor(Xc), Doctor), 
-     bagof(Xd, mask(Xd), Mask), 
-     bagof(Xe, covid(Xe), Covid),
+     get_environment(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid),
      write('Map is '), write(Xlimit), write(' x '), write(Ylimit), nl,
      write('Actor: '), write(Actor), nl,
      write('Home: '), write(Home), nl,
      write('Covid: '), write(Covid), nl,
      write('Mask: '), write(Mask), nl,
      write('Doctor: '), write(Doctor), nl, nl,
-     change_coordinates(Xlimit, Ylimit, Actor, Actor1),
-     change_coordinates(Xlimit, Ylimit, Home, Home1),
-     change_coordinates(Xlimit, Ylimit, Doctor, Doctor1),
-     change_coordinates(Xlimit, Ylimit, Mask, Mask1),
-     change_coordinates(Xlimit, Ylimit, Covid, Covid1),
-     draw_map(Xlimit, Ylimit, Actor1, Home1, Doctor1, Mask1, Covid1),
+     draw_map(),
      nl,
-     %dfs(), nl,
+     dfs(), nl,
      astar(), nl,
      write('========= END OF TEST CASE ========='),
      reset_environment().
