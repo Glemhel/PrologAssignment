@@ -1,31 +1,8 @@
-:- dynamic limitcount/1.
-
-maxbacktrack :-
-    retract(limitcount(Current)),
-    Current > 0,
-    Next is Current-1,
-    assert(limitcount(Next)).
-
-firstN(N,Pred) :-
-    retractall(limitcount(_)),
-    asserta(limitcount(N)),
-    Pred,
-    maxbacktrack.
-
-findN(N,Term,Pred,List) :-
-    findall(Term,firstN(N,Pred),List).
-
-:- dynamic min_path_length/1.
-
 /**
  * Mikhail Rudakov
  * BS19-02
  * Prolog Programming Assignment
  * 
- **/
-
-/**
- * map for the agent
  **/
 :- dynamic map_xlimit/1.
 :- dynamic map_ylimit/1.
@@ -34,6 +11,7 @@ findN(N,Term,Pred,List) :-
 :- dynamic covid/1.
 :- dynamic doctor/1.
 :- dynamic mask/1.
+:- dynamic min_path_length/1.
 
 infinity(1000).
 
@@ -42,31 +20,44 @@ infinity(1000).
  * General purpose functions
  **/
 
+% Represent Execution time in convinient format
 convert_time(ExecutionTime, Minutes, Seconds, MilliSeconds) :-
-     Minutes is ExecutionTime // 60000, Seconds is ExecutionTime // 1000 mod 60, MilliSeconds is ExecutionTime mod 1000.
+     Minutes is ExecutionTime // 60000, 
+     Seconds is ExecutionTime // 1000 mod 60, 
+     MilliSeconds is ExecutionTime mod 1000.
 
+% Display result of the program execution
+
+% Path is [] - not found -> FAIL
 output_results([], ExecutionTime) :-
+     % print execution time
      convert_time(ExecutionTime, M, S, Ms),
      write('Result: lose'), nl,
      write('Execution time: '), write(M), write(' min. '), 
      write(S), write(' sec. '), write(Ms), write(' ms.'),  
      nl, !.
 
+% Path is not [] - print detailed information
 output_results(Path, ExecutionTime) :-
-     convert_time(ExecutionTime, M, S, Ms),
      write('Path on the map:'), nl,
+     % draw map with path on it
      draw_map(Path),
+     % print result, path and it's length
      write('Result: win'), nl, 
      write('Shortest path is: '), nl, write(Path), nl,
      length(Path, Length),
      write('Length: '), write(Length), nl,
+     % print execution time
+     convert_time(ExecutionTime, M, S, Ms),
      write('Execution time: '), write(M), write(' min. '), 
      write(S), write(' sec. '), write(Ms), write(' ms.').
 
+% Compute chessboard distance to the end for every cell in the array, return pair [distance, element]
 compute_distances([], []) :- !.
 compute_distances([H | T], [[D, H] | T1]) :-
      chessboard_distance(H, D), compute_distances(T, T1).
 
+% Get list of adjacent cells for the cell
 get_adjacent((X, Y), L) :-
      Yup is Y + 1,
      Ydown is Y - 1,
@@ -75,21 +66,24 @@ get_adjacent((X, Y), L) :-
      L = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
           (Xdown, Ydown)].
 
+% Check whether two cells are adjacent or not
 is_adjacent(P1, P2) :-
      get_adjacent(P1, L),
      member(P2, L).
 
-
+% Check whether two cells are adjacent or equal
 is_adjacent_or_equal(P1, P2) :-
      P1 = P2;
      get_adjacent(P1, L),
      member(P2, L).
 
+% Given array of pairs, return array of second elements of those pairs
 get_second([], []) :- !.
-
 get_second([[_, Hb] | T], [Hb | T1]) :-
      get_second(T, T1).
 
+% Get adjacent cells for the cell, and return them in special order (heuristics for backtracking)
+% Those closer to home are going first
 get_adjacent_heuristic((X, Y), Lheuristic) :-
      Yup is Y + 1,
      Ydown is Y - 1,
@@ -97,14 +91,19 @@ get_adjacent_heuristic((X, Y), Lheuristic) :-
      Xdown is X - 1,
      L0 = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
           (Xdown, Ydown)],
+     % Compute distances to the home
      compute_distances(L0, L1),
+     % Closer to home -> Earlier in the array
      sort(L1, L2),
      get_second(L2, Lheuristic).
 
+% Check whether two cells are adjacent or not
+% Used for generating adjacent cells in backtracking - therefore, heuristics is applied
 is_adjacent_heuristic(P1, P2) :-
      get_adjacent_heuristic(P1, L),
      member(P2, L).
 
+% Check whether cell is inside the map
 inside_map((X, Y)) :-
      X >= 0,
      Y >= 0,
@@ -113,242 +112,319 @@ inside_map((X, Y)) :-
      map_ylimit(Ymax),
      Y < Ymax.
  
-
+% Check if cell is not in the covid zone
 is_covid_free(Position) :-
+     % For each of cell adjacent to positions, covid should be not in this cell
      forall(is_adjacent(Position, Cell), not(covid(Cell))).
 
+% is_covid_free(Safety, Position)
+% checking if Position if safe to go in
+% If we wear a mask / been to doctor, it is safe anyway
 is_covid_free(1, _) :- !.
-
+% If we do not wear a mask / doctor, check if cell is in the covid zone
 is_covid_free(0, Position) :-
      is_covid_free(Position).
 
+% Is doctor or mask in the current position
 is_doctor_or_mask(Position) :-
      doctor(Position); mask(Position).
 
+% Return 0 as a second argument if neither doctor or mask are in Position cell
 is_doctor_or_mask(Position, 0) :-
      not(doctor(Position)), not(mask(Position)).
-
+% Return 1 as a second argument if there is doctor or mask in Position cell
 is_doctor_or_mask(Position, 1) :-
      doctor(Position); mask(Position).
 
 
+%
+% Backtracking Funcionality
+%
 
-
-/**
- * Backtracking Functionality
- **/
-
-% <Helper functions>
+% Heuristics for checking how many steps makes sense to set as upper bound for path length 
+% 3 * N for <= 2 covid cells on the map
 maximum_possible_steps(D) :-
      map_xlimit(Xmax),
      map_ylimit(Ymax),
      D is 3 * max(Xmax, Ymax).
-     %D is 12.
 
+% Try to update shortest path if possible. Fails if Path is longer than minimal one so far.
 heuristics_shortest_path_set(Path) :-
+     % get current minimal path
      min_path_length(MinLength),
      length(Path, Length),
+     % compare lengths
      Length < MinLength,
+     % update length if needed
      assertz(min_path_length(Length)),
      retract(min_path_length(MinLength)), !.
 
+% Check whether current path is shorter than minimal so far - 
+% if not, does not make sense to backtrack further
 heuristics_shortest_path_check(Path) :-
      min_path_length(MinLength),
      length(Path, Length),
      Length < MinLength, !.
 
-% </Helper functions>
+% Generate straight path from positoin to home, covid cells do not matter
+% If at home, path is empty
+generate_path_home(Position, []) :- 
+     finish(Position), !.
 
-generate_path(CurrentPosition, []) :- 
-     finish(CurrentPosition), !.
-
-generate_path((Xcurrent, Ycurrent), [(Xnext, Ynext) | Path]) :- 
+% Make step in direction of home - Xnext, Ynext
+generate_path_home((X, Y), [(Xnext, Ynext) | Path]) :- 
      finish((Xfinish, Yfinish)),
      (
-     Xcurrent < Xfinish, Xnext is Xcurrent + 1;
-     Xcurrent = Xfinish, Xnext = Xfinish;
-     Xcurrent > Xfinish, Xnext is Xcurrent - 1
+     X < Xfinish, Xnext is X + 1;
+     X = Xfinish, Xnext = Xfinish;
+     X > Xfinish, Xnext is X - 1
      ), 
      (
-     Ycurrent < Yfinish, Ynext is Ycurrent + 1;
-     Ycurrent = Yfinish, Ynext = Yfinish;
-     Ycurrent > Yfinish, Ynext is Ycurrent - 1
+     Y < Yfinish, Ynext is Y + 1;
+     Y = Yfinish, Ynext = Yfinish;
+     Y > Yfinish, Ynext is Y - 1
      ), 
-     generate_path((Xnext, Ynext), Path).
+     % Generate path from next cell to home
+     generate_path_home((Xnext, Ynext), Path).
 
-dfs(CurrentPosition, Visited, [CurrentPosition]) :-
-     finish(CurrentPosition),
+% Backtracking: If we are in home, update path
+dfs(Position, Visited, [Position]) :-
+     finish(Position),
      heuristics_shortest_path_set(Visited),
      !.
 
-dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
-     is_doctor_or_mask(CurrentPosition),
-     generate_path(CurrentPosition, Path), 
+% Backtracking (heuristics) :
+% If we are at mask / doctor, go straight to home
+dfs(Position, Visited, [Position | Path]) :-
+     is_doctor_or_mask(Position),
+     % generate path home directly
+     generate_path_home(Position, Path), 
+     % merge two paths
      append(Visited, Path, PathHome),
+     % update path if possible
      heuristics_shortest_path_set(PathHome),
      !.
 
-dfs(CurrentPosition, Visited, [CurrentPosition | Path]) :-
+% Backtracking: find way home by brute-forcing all neighbours cells
+dfs(Position, Visited, [Position | Path]) :-
+     % Heuristics for path length
      heuristics_shortest_path_check(Visited),
-     is_adjacent_heuristic(CurrentPosition, NextPosition),
+     % Generate adjacent cells
+     is_adjacent_heuristic(Position, NextPosition),
+     % Check if inside the map
      inside_map(NextPosition),
+     % Check they are not visited yet
      not(member(NextPosition, Visited)),
+     % And free of covid, as we have no mask/doctor by now
      is_covid_free(NextPosition),
+     % Start backtracking from NextPositon, updating Visited array
      dfs(NextPosition, [NextPosition | Visited], Path).
 
+% Find some Path that leads home, or Fail if none exists
 find_path_dfs(Path) :-
      start(Start),
-     finish(Home), inside_map(Home),
      dfs(Start, [Start], Path).
 
+% Enumerate all possible paths and choose minimal one
 min_path_dfs(MinPath) :-    
+     % Enumerate all paths that lead home
      bagof(Path, find_path_dfs(Path), L),
+     % Last path in the array is shortest due to heuristcs applied (heuristics_shortest_path_set/check)
      last(L, MinPath).
 
+% Print results of backtracking in the current environment
 dfs() :-
      write('Backtracking: '), nl,
      retractall(min_path_length(_)),
      maximum_possible_steps(X),
+     % limit on path length
      assertz(min_path_length(X)),
+     % measure time of execution
      statistics(walltime, _),
      (min_path_dfs(Path), !; Path = []),
      statistics(walltime, [_ | [ExecutionTime]]),
+     % print results
      output_results(Path, ExecutionTime),
+     % reset temporary variables
      retractall(min_path_length(_)).
 
-/**
- * A* Functionality
- **/
+%
+%    A-star functionality
+%
 
-determine_safety(1, _, 1) :- !.
-determine_safety(_, 1, 1) :- !.
-determine_safety(0, 0, 0) :- !.
+% Return 1 as 3rd argument if cell is safe and 0 if not
+% 1st argument - were we safe before this cell
+% 2nd arguemnt - are we safe in this cell (doctor / mask)
+% result is logical AND of variables - same to max of integers (0/1).
+determine_safety(X, Y, Z) :-
+     Z is max(X, Y).
 
+% Compute chessboard distance from given cell to the home
 chessboard_distance((X, Y), Distance) :-
      finish((Xfinish, Yfinish)),
      Distance is max(abs(X - Xfinish), abs(Y - Yfinish)).
 
+% Update value with index I to Value in array and return newarray as 4th argument
+% If index is 0, update head and tails are the same
 update_value(0, Value, [_ | T], [H1 | T1]) :-
      T1 = T, H1 = Value, !.
-
+% If index is not 0, go 1 step further
 update_value(I, Value, [H | T], [H | T1]) :-
      I1 is I - 1,
      update_value(I1, Value, T, T1).
 
+% Update value in 2d array
 update_value(I, J, Value, Array, NewArray) :-
+     % find needed row
      nth0(I, Array, Row),
+     % update value in it
      update_value(J, Value, Row, NewRow),
+     % update value in array of rows as in 1d array
      update_value(I, NewRow, Array, NewArray).
 
+% Update value in 3d array - same as 2d
 update_value(I, J, K, Value, Array, NewArray) :-
      nth0(I, Array, Row),
      update_value(J, K, Value, Row, NewRow),
      update_value(I, NewRow, Array, NewArray).
 
+% For each element (I, J) from input array, set Array[I][J] = Value, return results in NewArray
 update_values([], _, Array, Array) :- !.
 update_values([(I, J) | T], Value, Array, NewArray) :-
      update_values(T, Value, Array, TailArray),
      update_value(I, J, Value, TailArray, NewArray).
 
+% Create 1d array of Value with I elements
 create_array(0, _, []) :- !.
 create_array(I, Value, [Value | T]) :-
      I1 is I - 1,
      create_array(I1, Value, T).
 
-
+% Create 2d array
 create_array(0, _, _, []) :- !.
 create_array(I, J, Value, [Array | T]) :-
      I1 is I - 1,
      create_array(J, Value, Array),
      create_array(I1, J, Value, T).
 
+% Create 3d array
 create_array(0, _, _, _, []) :- !.
 create_array(I, J, K, Value, [Array | T]) :-
      I1 is I - 1,
      create_array(J, K, Value, Array),
      create_array(I1, J, K, Value, T).
 
+% Get value from 2d array
 nth0_2d(J, K, Array, Value) :-
      nth0(J, Array, Row),
      nth0(K, Row, Value).
 
+% Get value from 3d array
 nth0_3d(I, J, K, Array, Value) :-
      nth0(I, Array, Row),
      nth0_2d(J, K, Row, Value).
 
+% Add neighbours of cell to the Priority Queue
+% Empty - terminate
 process_neighbours([], _, _, _, Distances, Predecessors, VerticesHeap, Distances, Predecessors, VerticesHeap) :- !.
-process_neighbours([(Xcurrent, Ycurrent) | T], Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
+process_neighbours([(X, Y) | T], Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
                     Distances, Predecessors, VerticesHeap, DistancesNew, PredecessorsNew, VerticesHeapNew) :- 
      (
-          nth0_3d(Xcurrent, Ycurrent, Safety, Distances, DistanceOld),
+          % if path to the cell is shorter than existing one
+          nth0_3d(X, Y, Safety, Distances, DistanceOld),
           DistanceToCurrent < DistanceOld,
           (
-          chessboard_distance((Xcurrent, Ycurrent), Heuristics),
+          % Add cell to the Priority Queue, update Predecessor and Distance
+          chessboard_distance((X, Y), Heuristics),
+          % Priority is Distance (Home, Cell) + Heuristics, which is chessboard distance
           Priority is DistanceToCurrent + Heuristics,
-          update_value(Xcurrent, Ycurrent, Safety, DistanceToCurrent, Distances, DistancesUpd),
-          update_value(Xcurrent, Ycurrent, Safety, (Xpred, Ypred, Spred), Predecessors, PredecessorsUpd),
-          add_to_heap(VerticesHeap, Priority, (Xcurrent, Ycurrent, Safety), VerticesHeapUpd) 
+          update_value(X, Y, Safety, DistanceToCurrent, Distances, DistancesUpd),
+          update_value(X, Y, Safety, (Xpred, Ypred, Spred), Predecessors, PredecessorsUpd),
+          add_to_heap(VerticesHeap, Priority, (X, Y, Safety), VerticesHeapUpd) 
           ),
           !
           ;
+          % If cell does not make sense to consider, just skip it
           DistancesUpd = Distances, PredecessorsUpd = Predecessors, VerticesHeapUpd = VerticesHeap
      ),
+     % process next neighbour anyway
      process_neighbours(T, Safety, DistanceToCurrent, (Xpred, Ypred, Spred),
                DistancesUpd, PredecessorsUpd, VerticesHeapUpd, DistancesNew, PredecessorsNew, VerticesHeapNew).
 
 
-
+% Recursively build path to home
 build_path((X, Y, _), _, [(X, Y)]) :- 
      start((X, Y)),
      !.
-
+% build path for our predecessor, return path for us
 build_path((X, Y, S), Predecessors, PathHome) :- 
      nth0_3d(X, Y, S, Predecessors, (Xpred, Ypred, Spred)),
      build_path((Xpred, Ypred, Spred), Predecessors, PathHomeHead),
+     % path from (X, Y) to Home is path from Pred[X, Y] to Home + (X, Y) itself
      append(PathHomeHead, [(X, Y)], PathHome).
 
+% A* case when at home
 astar(VerticesHeap, _, Predecessors, PathHome) :-
      finish((Xfinish, Yfinish)),
      min_of_heap(VerticesHeap, _, (Xfinish, Yfinish, SafetyFinish)),
+     % recursively with the help of Predecessors array build path home - A* terminates
      build_path((Xfinish, Yfinish, SafetyFinish), Predecessors, PathHome),
      !.
 
+% A* iteration
 astar(VerticesHeap, Distances, Predecessors, PathHome) :-
-     get_from_heap(VerticesHeap, _Priority, (Xcurrent, Ycurrent, SafetyCurrent), VerticesHeap1),
-     Position = (Xcurrent, Ycurrent),
-     nth0_3d(Xcurrent, Ycurrent, SafetyCurrent, Distances, DistanceToCurrent),
+     % Get the minimum value on Priority Queue
+     get_from_heap(VerticesHeap, _Priority, (X, Y, SafetyCurrent), VerticesHeap1),
+     Position = (X, Y),
+     % Get distance to current cell
+     nth0_3d(X, Y, SafetyCurrent, Distances, DistanceToCurrent),
      DistanceToNext is DistanceToCurrent + 1,
+     % Generate cells to add to queue:
+     % adjacent cells
      get_adjacent(Position, AdjacentCells),
+     % only those inside the map
      include(inside_map, AdjacentCells, AdjacentCells1),
+     % include only safe cells
      is_doctor_or_mask(Position, SafetyPosition),
      determine_safety(SafetyCurrent, SafetyPosition, SafetyNext),
      include(is_covid_free(SafetyNext), AdjacentCells1, AdjacentCellsToProcess),
-     process_neighbours(AdjacentCellsToProcess, SafetyNext, DistanceToNext, (Xcurrent, Ycurrent, SafetyCurrent),
+     % Add neighbours to the queue
+     process_neighbours(AdjacentCellsToProcess, SafetyNext, DistanceToNext, (X, Y, SafetyCurrent),
                Distances, Predecessors, VerticesHeap1, DistancesNew, PredecessorsNew, VerticesHeapNew),
+     % Start new iteration of A*
      astar(VerticesHeapNew, DistancesNew, PredecessorsNew, PathHome).
      
-
+% Set up variables for A* and run it
 min_path_astar(PathHome) :-
+     % Set up Priority Queue
      empty_heap(Heap),
      start((Xstart, Ystart)),
      add_to_heap(Heap, 0, (Xstart, Ystart, 0), VerticesHeap),
      map_xlimit(Xmax), map_ylimit(Ymax), infinity(Inf),
+     % Set up array of distances to start cell
      create_array(Xmax, Ymax, 2, Inf, Distances),
      update_value(Xstart, Ystart, 0, 0, Distances, Distances1),
+     % Set up array of predecessors
      create_array(Xmax, Ymax, 2, -1, Predecessors),
+     % Run A* - L contains the only value as A* is non-recursive algorithm and is true 
+     % only for single Path found
      bagof(Path, astar(VerticesHeap, Distances1, Predecessors, Path), L),
      nth0(0, L, PathHome).
 
+% Start A* algorithm, print it's result
 astar() :-
      write('A* algorithm: '), nl,
+     % measure time
      statistics(walltime, _),
      (min_path_astar(Path), !; Path = []),
      statistics(walltime, [_ | [ExecutionTime]]),
+     % ouput results and map with path
      output_results(Path, ExecutionTime).
 
-% Testing function and maps test cases
 
+% Testing funcionality 
 
+% Reset coordinates of covid, doctor, etc.
 reset_environment() :- 
      retractall(map_xlimit(_)),
      retractall(map_ylimit(_)),
@@ -358,6 +434,7 @@ reset_environment() :-
      retractall(doctor(_)),
      retractall(mask(_)).
 
+% Get everything in the environment
 get_environment(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid) :-
      map_xlimit(Xlimit), map_ylimit(Ylimit), 
      bagof(Xa, start(Xa), Actor), 
@@ -367,6 +444,7 @@ get_environment(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid) :-
      bagof(Xe, covid(Xe), Covid),
      !. 
 
+% Test cases
 set_environment(t1) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
@@ -408,6 +486,66 @@ set_environment(t4) :-
      assertz(doctor((3, 3))),
      assertz(mask((6, 1))), !.
 
+set_environment(t5) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((6, 2))),
+     assertz(covid((2, 3))),
+     assertz(covid((5, 4))),
+     assertz(doctor((0, 5))),
+     assertz(mask((2, 8))), !.
+
+set_environment(t6) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((7, 5))),
+     assertz(covid((6, 3))),
+     assertz(covid((5, 4))),
+     assertz(doctor((5, 8))),
+     assertz(mask((8, 3))), !.
+
+set_environment(t7) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((0, 8))),
+     assertz(covid((4, 7))),
+     assertz(covid((1, 6))),
+     assertz(doctor((1, 0))),
+     assertz(mask((0, 1))), !.
+
+set_environment(t8) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((7, 7))),
+     assertz(covid((6, 3))),
+     assertz(covid((1, 4))),
+     assertz(doctor((6, 0))),
+     assertz(mask((0, 6))), !.
+
+set_environment(t9) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((8, 2))),
+     assertz(covid((4, 2))),
+     assertz(covid((7, 0))),
+     assertz(doctor((2, 6))),
+     assertz(mask((1, 3))), !.
+
+set_environment(t10) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((3, 6))),
+     assertz(covid((7, 8))),
+     assertz(covid((2, 5))),
+     assertz(doctor((8, 5))),
+     assertz(mask((5, 5))), !.
+
 set_environment(tsmall) :-
      assertz(map_xlimit(4)),
      assertz(map_ylimit(4)),
@@ -448,6 +586,7 @@ set_environment(ttest) :-
      assertz(doctor((1, 2))),
      assertz(mask((2, 1))), !.
 
+% Random generation of N1 * N1 map
 set_environment(N1) :-
      (
      N1 < 10, N is N1 - 1,
@@ -457,6 +596,7 @@ set_environment(N1) :-
      random_between(0, N, Xdoc), random_between(0, N, Ydoc),
      random_between(0, N, Xcov1), random_between(0, N, Ycov1),
      random_between(0, N, Xcov2), random_between(0, N, Ycov2),
+     % check conditions - not in the same cell, etc.
      unique([(Xfinish, Yfinish), (Xmask, Ymask), (Xdoc, Ydoc), (Xcov1, Ycov1), (Xcov2, Ycov2), 
                (Xstart, Ystart) ]),
 
@@ -480,16 +620,18 @@ set_environment(N1) :-
      ) ;
      set_environment(N1).
 
+% True if array consists of unique values
 unique([]) :- !.
 unique([H | T]) :-
      not(member(H, T)), 
      unique(T).
 
-
+% print 1d array
 print_array([]) :- !.
 print_array([H | T]) :-
      write(H), print_array(T).
 
+% print 2d array with bars
 print_array_2d([]) :- !.
 print_array_2d([H | T]) :-
      write("|"),
@@ -497,6 +639,7 @@ print_array_2d([H | T]) :-
      write("|"), nl,
      print_array_2d(T).
 
+% Print array in a nice way
 print_array_2d(Xlimit, Map) :-
      create_array(Xlimit, "=", Line),
      append([" "], Line, Line1),
@@ -508,11 +651,13 @@ print_array_2d(Xlimit, Map) :-
      print_array_2d(Map),
      print_array(LineDown), nl.
 
+% Change coordinates for drawing
 change_coordinates(_, _, [], []) :- !.
 change_coordinates(Xlimit, Ylimit, [(X, Y) | T], [(X1, Y1) | T1]) :-
      Y1 is X, X1 is Ylimit - Y - 1,
      change_coordinates(Xlimit, Ylimit, T, T1).
 
+% Draw map with Path on it
 draw_map(Path) :-
      get_environment(Xlimit, Ylimit, Actor0, Home0, Doctor0, Mask0, Covid0),
      create_array(Xlimit, Ylimit, '.', Map),
@@ -522,6 +667,7 @@ draw_map(Path) :-
      change_coordinates(Xlimit, Ylimit, Mask0, Mask1),
      change_coordinates(Xlimit, Ylimit, Covid0, Covid1),
      change_coordinates(Xlimit, Ylimit, Path, Path1),
+     % include only cell that are inside the map
      include(inside_map, Actor1, Actor2), update_values(Actor2, 'A', Map, Map1),
      include(inside_map, Home1, Home2), update_values(Home2, 'H', Map1, Map2),
      include(inside_map, Doctor1, Doctor2), update_values(Doctor2, 'D', Map2, Map3),
@@ -530,6 +676,7 @@ draw_map(Path) :-
      update_values(Path1, 'o', Map5, MapFinal),
      print_array_2d(Xlimit, MapFinal).
 
+% Draw map
 draw_map() :-
      get_environment(Xlimit, Ylimit, Actor0, Home0, Doctor0, Mask0, Covid0),
      create_array(Xlimit, Ylimit, '.', Map),
@@ -545,10 +692,13 @@ draw_map() :-
      include(inside_map, Covid1, Covid2), update_values(Covid2, 'C', Map4, MapFinal),
      print_array_2d(Xlimit, MapFinal).
 
-
+% TESTING FUNCTION
+% if X is a number, generate random X by X map. 3 < X < 10.
+% if X is atom, try to find test map for it
+% X could be 't1' - 't15', and some specific values
+% 'tsmall', 'thard', ...
 test(X) :-
-     write('========= START OF TEST CASE ========='),
-     write('Running on map '), write(X), write(':'), nl, nl,
+     write('========= START OF TEST CASE ========='), nl,
      reset_environment(), set_environment(X),
      get_environment(Xlimit, Ylimit, Actor, Home, Doctor, Mask, Covid),
      write('Map is '), write(Xlimit), write(' x '), write(Ylimit), nl,
