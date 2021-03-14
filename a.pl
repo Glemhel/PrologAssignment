@@ -21,8 +21,9 @@ test(X) :-
      write('Doctor: '), write(Doctor), nl, nl,
      draw_map(),
      nl,
-     astar(), nl,
-     dfs(), nl,
+     astar(), nl, nl,
+     dfs('Variant1'), nl, nl,
+     dfs('Variant2'), nl,
      write('========= END OF TEST CASE ========='),
      reset_environment().
 
@@ -417,8 +418,21 @@ get_second([], []) :- !.
 get_second([[_, Hb] | T], [Hb | T1]) :-
      get_second(T, T1).
 
+get_third([], []) :- !.
+get_third([[_, _, Hb] | T], [Hb | T1]) :-
+     get_third(T, T1).
+
+compute_covid_neighbours([], []) :- !.
+compute_covid_neighbours([[D, Cell] | T], [[D, N, Cell] | T1]) :-
+     get_adjacent(Cell, AdjacentCells),
+     append([Cell], AdjacentCells, AdjacentOrEqual),
+     exclude(is_covid_free, AdjacentOrEqual, InfectedCells),
+     length(InfectedCells, N),
+     compute_covid_neighbours(T, T1).
+
 % Get adjacent cells for the cell, and return them in special order (heuristics for backtracking)
 % Those closer to home are going first
+% VARIANT 1 BACKTRACKING
 get_adjacent_heuristic((X, Y), Lheuristic) :-
      Yup is Y + 1,
      Ydown is Y - 1,
@@ -432,10 +446,33 @@ get_adjacent_heuristic((X, Y), Lheuristic) :-
      sort(L1, L2),
      get_second(L2, Lheuristic).
 
+% Same as previous + perception of covid Variant 2: count covid cells adjacent to each cell,
+% use it as second sorting parameter
+% VARIANT 2 BACKTRACKING 
+get_adjacent_heuristic2((X, Y), Lheuristic) :-
+     Yup is Y + 1,
+     Ydown is Y - 1,
+     Xup is X + 1,
+     Xdown is X - 1,
+     L0 = [(Xup, Yup), (Xup, Y), (X, Yup), (Xdown, Yup), (Xup, Ydown), (Xdown, Y), (X, Ydown),
+          (Xdown, Ydown)],
+     % Compute distances to the home
+     compute_distances(L0, L1),
+     % Compute number of adjacent covid cells for each cell - add to the array
+     compute_covid_neighbours(L1, L2),
+     % Closer to home -> Earlier in the array, Less covid neighbours -> Earlier in the array
+     sort(L2, L3),
+     get_third(L3, Lheuristic).
+
 % Check whether two cells are adjacent or not
 % Used for generating adjacent cells in backtracking - therefore, heuristics is applied
-is_adjacent_heuristic(P1, P2) :-
+% Variants of perception matter - Variant 2 adds additional order of sorting - number of adjacent covid cells
+is_adjacent_heuristic('Variant1', P1, P2) :-
      get_adjacent_heuristic(P1, L),
+     member(P2, L).
+
+is_adjacent_heuristic('Variant2', P1, P2) :-
+     get_adjacent_heuristic2(P1, L),
      member(P2, L).
 
 % Check whether cell is inside the map
@@ -475,6 +512,8 @@ is_doctor_or_mask(Position, 1) :-
 % BACKTRACKING FUNCTIONALITY
 % BACKTRACKING FUNCTIONALITY
 % BACKTRACKING FUNCTIONALITY
+% VARIANTS 1 AND 2
+
 
 % Heuristics for checking how many steps makes sense to set as upper bound for path length 
 % 3 * N for <= 2 covid cells on the map
@@ -523,14 +562,14 @@ generate_path_home((X, Y), [(Xnext, Ynext) | Path]) :-
      generate_path_home((Xnext, Ynext), Path).
 
 % Backtracking: If we are in home, update path
-dfs(Position, Visited, [Position]) :-
+dfs(_Perception, Position, Visited, [Position]) :-
      finish(Position),
      heuristics_shortest_path_set(Visited),
      !.
 
 % Backtracking (heuristics) :
 % If we are at mask / doctor, go straight to home
-dfs(Position, Visited, [Position | Path]) :-
+dfs(_Perception, Position, Visited, [Position | Path]) :-
      is_doctor_or_mask(Position),
      % generate path home directly
      generate_path_home(Position, Path), 
@@ -541,11 +580,11 @@ dfs(Position, Visited, [Position | Path]) :-
      !.
 
 % Backtracking: find way home by brute-forcing all neighbours cells
-dfs(Position, Visited, [Position | Path]) :-
+dfs(Perception, Position, Visited, [Position | Path]) :-
      % Heuristics for path length
      heuristics_shortest_path_check(Visited),
      % Generate adjacent cells
-     is_adjacent_heuristic(Position, NextPosition),
+     is_adjacent_heuristic(Perception, Position, NextPosition),
      % Check if inside the map
      inside_map(NextPosition),
      % Check they are not visited yet
@@ -553,30 +592,30 @@ dfs(Position, Visited, [Position | Path]) :-
      % And free of covid, as we have no mask/doctor by now
      is_covid_free(NextPosition),
      % Start backtracking from NextPositon, updating Visited array
-     dfs(NextPosition, [NextPosition | Visited], Path).
+     dfs(Perception, NextPosition, [NextPosition | Visited], Path).
 
 % Find some Path that leads home, or Fail if none exists
-find_path_dfs(Path) :-
+find_path_dfs(Perception, Path) :-
      start(Start),
-     dfs(Start, [Start], Path).
+     dfs(Perception, Start, [Start], Path).
 
 % Enumerate all possible paths and choose minimal one
-min_path_dfs(MinPath) :-    
+min_path_dfs(Perception, MinPath) :-    
      % Enumerate all paths that lead home
-     bagof(Path, find_path_dfs(Path), L),
+     bagof(Path, find_path_dfs(Perception, Path), L),
      % Last path in the array is shortest due to heuristcs applied (heuristics_shortest_path_set/check)
      last(L, MinPath).
 
 % Print results of backtracking in the current environment
-dfs() :-
-     write('Backtracking: '), nl,
+dfs(VariantCovidPerception) :-
+     write('Backtracking '),write(VariantCovidPerception), write(' :'), nl,
      retractall(min_path_length(_)),
      maximum_possible_steps(X),
      % limit on path length
      assertz(min_path_length(X)),
      % measure time of execution
      statistics(walltime, _),
-     (min_path_dfs(Path), !; Path = []),
+     (min_path_dfs(VariantCovidPerception, Path), !; Path = []),
      statistics(walltime, [_ | [ExecutionTime]]),
      % print results
      output_results(Path, ExecutionTime),
