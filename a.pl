@@ -418,10 +418,13 @@ get_second([], []) :- !.
 get_second([[_, Hb] | T], [Hb | T1]) :-
      get_second(T, T1).
 
+% Given array of tuples, return array of third elements of those pairs
 get_third([], []) :- !.
 get_third([[_, _, Hb] | T], [Hb | T1]) :-
      get_third(T, T1).
 
+% For each Cell in the list, calculate number of covid-free cell in its neighbourhood and
+% safe to the another list - used for Variant 2 of Backtracking
 compute_covid_neighbours([], []) :- !.
 compute_covid_neighbours([[D, Cell] | T], [[D, N, Cell] | T1]) :-
      get_adjacent(Cell, AdjacentCells),
@@ -561,7 +564,7 @@ generate_path_home((X, Y), [(Xnext, Ynext) | Path]) :-
      % Generate path from next cell to home
      generate_path_home((Xnext, Ynext), Path).
 
-% Backtracking: If we are in home, update path
+% Backtracking: If we are in home, update path if possbile - function terminates with success
 dfs(_Perception, Position, Visited, [Position]) :-
      finish(Position),
      heuristics_shortest_path_set(Visited),
@@ -631,7 +634,7 @@ dfs(VariantCovidPerception) :-
 
 % Return 1 as 3rd argument if cell is safe and 0 if not
 % 1st argument - were we safe before this cell
-% 2nd arguemnt - are we safe in this cell (doctor / mask)
+% 2nd argument - are we safe in this cell (doctor / mask)
 % result is logical AND of variables - same to max of integers (0/1).
 determine_safety(X, Y, Z) :-
      Z is max(X, Y).
@@ -666,7 +669,7 @@ process_neighbours([(X, Y) | T], Safety, DistanceToCurrent, (Xpred, Ypred, Spred
           ),
           !
           ;
-          % If cell does not make sense to consider, just skip it
+          % If cell does not make sense to consider, just keep the parameters
           DistancesUpd = Distances, PredecessorsUpd = Predecessors, VerticesHeapUpd = VerticesHeap
      ),
      % process next neighbour anyway
@@ -759,11 +762,11 @@ convert_time(ExecutionTime, Minutes, Seconds, MilliSeconds) :-
 % Path is [] - not found -> FAIL
 output_results([], ExecutionTime) :-
      % print execution time
-    % convert_time(ExecutionTime, M, S, Ms),
+     convert_time(ExecutionTime, M, S, Ms),
      write('Result: lose'), nl,
-     write('Execution time: '), %write(M), write(' min. '), 
-     %write(S), write(' sec. '),
-     write(ExecutionTime), write(' ms.'),  
+     write('Execution time: '), write(M), write(' min. '), 
+     write(S), write(' sec. '),
+     write(Ms), write(' ms.'),  
      nl, !.
 % Path is not [] - print detailed information
 output_results(Path, ExecutionTime) :-
@@ -777,10 +780,10 @@ output_results(Path, ExecutionTime) :-
      Steps is Length - 1,
      write('Steps done: '), write(Steps), nl,
      % print execution time
-     %convert_time(ExecutionTime, M, S, Ms),
-     write('Execution time: '),% write(M), write(' min. '), 
-     %write(S), write(' sec. '), 
-     write(ExecutionTime), write(' ms.').
+     convert_time(ExecutionTime, M, S, Ms),
+     write('Execution time: '), write(M), write(' min. '), 
+     write(S), write(' sec. '), 
+     write(Ms), write(' ms.').
 
 % Reset coordinates of covid, doctor, etc.
 reset_environment() :- 
