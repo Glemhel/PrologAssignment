@@ -65,23 +65,13 @@ set_environment(t3) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
-     assertz(finish((8, 0))),
-     assertz(covid((6, 3))),
-     assertz(covid((6, 1))),
-     assertz(doctor((6, 8))),
-     assertz(mask((1, 4))), !.
-
-set_environment(t4) :-
-     assertz(map_xlimit(9)),
-     assertz(map_ylimit(9)),
-     assertz(start((0, 0))),
      assertz(finish((0, 5))),
      assertz(covid((1, 3))),
      assertz(covid((4, 0))),
      assertz(doctor((3, 3))),
      assertz(mask((6, 1))), !.
 
-set_environment(t5) :-
+set_environment(t4) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -91,7 +81,7 @@ set_environment(t5) :-
      assertz(doctor((0, 5))),
      assertz(mask((2, 8))), !.
 
-set_environment(t6) :-
+set_environment(t5) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -101,7 +91,7 @@ set_environment(t6) :-
      assertz(doctor((5, 8))),
      assertz(mask((8, 3))), !.
 
-set_environment(t7) :-
+set_environment(t6) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -111,7 +101,7 @@ set_environment(t7) :-
      assertz(doctor((1, 0))),
      assertz(mask((0, 1))), !.
 
-set_environment(t8) :-
+set_environment(t7) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -121,7 +111,7 @@ set_environment(t8) :-
      assertz(doctor((6, 0))),
      assertz(mask((0, 6))), !.
 
-set_environment(t9) :-
+set_environment(t8) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -131,7 +121,7 @@ set_environment(t9) :-
      assertz(doctor((2, 6))),
      assertz(mask((1, 3))), !.
 
-set_environment(t10) :-
+set_environment(t9) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -141,7 +131,7 @@ set_environment(t10) :-
      assertz(doctor((8, 5))),
      assertz(mask((5, 5))), !.
 
-set_environment(t11) :-
+set_environment(t10) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -151,7 +141,7 @@ set_environment(t11) :-
      assertz(doctor((5, 5))),
      assertz(mask((4, 4))), !.
 
-set_environment(t12) :-
+set_environment(t11) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -161,17 +151,7 @@ set_environment(t12) :-
      assertz(doctor((0, 4))),
      assertz(mask((3, 7))), !.
 
-set_environment(t13) :-
-     assertz(map_xlimit(9)),
-     assertz(map_ylimit(9)),
-     assertz(start((0, 0))),
-     assertz(finish((4, 6))),
-     assertz(covid((5, 5))),
-     assertz(covid((8, 7))),
-     assertz(doctor((5, 8))),
-     assertz(mask((4, 0))), !.
-
-set_environment(t14) :-
+set_environment(t12) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -181,7 +161,27 @@ set_environment(t14) :-
      assertz(doctor((4, 5))),
      assertz(mask((8, 5))), !.
 
-set_environment(t15) :-
+set_environment(t13) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((8, 8))),
+     assertz(covid((3, 4))),
+     assertz(covid((0, 6))),
+     assertz(doctor((6, 2))),
+     assertz(mask((4, 6))), !.
+
+set_environment(tlong1) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((8, 0))),
+     assertz(covid((6, 3))),
+     assertz(covid((6, 1))),
+     assertz(doctor((6, 8))),
+     assertz(mask((1, 4))), !.
+
+set_environment(tlong2) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
@@ -759,10 +759,11 @@ convert_time(ExecutionTime, Minutes, Seconds, MilliSeconds) :-
 % Path is [] - not found -> FAIL
 output_results([], ExecutionTime) :-
      % print execution time
-     convert_time(ExecutionTime, M, S, Ms),
+    % convert_time(ExecutionTime, M, S, Ms),
      write('Result: lose'), nl,
-     write('Execution time: '), write(M), write(' min. '), 
-     write(S), write(' sec. '), write(Ms), write(' ms.'),  
+     write('Execution time: '), %write(M), write(' min. '), 
+     %write(S), write(' sec. '),
+     write(ExecutionTime), write(' ms.'),  
      nl, !.
 % Path is not [] - print detailed information
 output_results(Path, ExecutionTime) :-
@@ -776,9 +777,10 @@ output_results(Path, ExecutionTime) :-
      Steps is Length - 1,
      write('Steps done: '), write(Steps), nl,
      % print execution time
-     convert_time(ExecutionTime, M, S, Ms),
-     write('Execution time: '), write(M), write(' min. '), 
-     write(S), write(' sec. '), write(Ms), write(' ms.').
+     %convert_time(ExecutionTime, M, S, Ms),
+     write('Execution time: '),% write(M), write(' min. '), 
+     %write(S), write(' sec. '), 
+     write(ExecutionTime), write(' ms.').
 
 % Reset coordinates of covid, doctor, etc.
 reset_environment() :- 
