@@ -21,10 +21,23 @@ test(X) :-
      write('Doctor: '), write(Doctor), nl, nl,
      draw_map(),
      nl,
-     dfs(), nl,
      astar(), nl,
+     dfs(), nl,
      write('========= END OF TEST CASE ========='),
      reset_environment().
+
+% input your desired parameters here
+% at least one entity of each type required. If some kind of entity should be absent on the map,
+% place it far way outside, like covid((100, 100)). Any numbers of covids/doctors/masks allowed.
+set_environment(ttest) :-
+     assertz(map_xlimit(6)),
+     assertz(map_ylimit(6)),
+     assertz(start((0, 0))),
+     assertz(finish((1, 5))),
+     assertz(covid((0, 4))),
+     assertz(covid((2, 2))),
+     assertz(doctor((2, 5))),
+     assertz(mask((5, 5))), !.
 
 % Test cases
 set_environment(t1) :-
@@ -151,11 +164,31 @@ set_environment(t13) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
-     assertz(finish((6, 6))),
-     assertz(covid((6, 0))),
-     assertz(covid((7, 6))),
-     assertz(doctor((3, 8))),
-     assertz(mask((0, 3))), !.
+     assertz(finish((4, 6))),
+     assertz(covid((5, 5))),
+     assertz(covid((8, 7))),
+     assertz(doctor((5, 8))),
+     assertz(mask((4, 0))), !.
+
+set_environment(t14) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((8, 1))),
+     assertz(covid((6, 1))),
+     assertz(covid((7, 3))),
+     assertz(doctor((4, 5))),
+     assertz(mask((8, 5))), !.
+
+set_environment(t15) :-
+     assertz(map_xlimit(9)),
+     assertz(map_ylimit(9)),
+     assertz(start((0, 0))),
+     assertz(finish((4, 6))),
+     assertz(covid((5, 5))),
+     assertz(covid((8, 7))),
+     assertz(doctor((5, 8))),
+     assertz(mask((4, 0))), !.
 
 set_environment(tsmall1) :-
      assertz(map_xlimit(4)),
@@ -241,25 +274,12 @@ set_environment(tlose2) :-
      assertz(map_xlimit(9)),
      assertz(map_ylimit(9)),
      assertz(start((0, 0))),
-     assertz(finish((0, 8))),
-     assertz(covid((4, 7))),
-     assertz(covid((1, 6))),
-     assertz(doctor((2, 8))),
-     assertz(mask((1, 8))), !.
+     assertz(finish((8, 8))),
+     assertz(covid((5, 7))),
+     assertz(covid((7, 5))),
+     assertz(doctor((7, 8))),
+     assertz(mask((8, 7))), !.
 
-
-% input your desired parameters here
-% at least one entity of each type required. If some kind of entity should be absent on the map,
-% place it far way outside, like covid((100, 100)). Any numbers of covids/doctors/masks allowed.
-set_environment(ttest) :-
-     assertz(map_xlimit(9)),
-     assertz(map_ylimit(9)),
-     assertz(start((0, 0))),
-     assertz(finish((8, 6))),
-     assertz(covid((4, 6))),
-     assertz(covid((1, 5))),
-     assertz(doctor((8, 2))),
-     assertz(mask((5, 3))), !.
 
 % Random generation of N1 * N1 map
 set_environment(N1) :-
@@ -714,7 +734,8 @@ output_results(Path, ExecutionTime) :-
      write('Result: win'), nl, 
      write('Shortest path is: '), nl, write(Path), nl,
      length(Path, Length),
-     write('Length: '), write(Length), nl,
+     Steps is Length - 1,
+     write('Steps done: '), write(Steps), nl,
      % print execution time
      convert_time(ExecutionTime, M, S, Ms),
      write('Execution time: '), write(M), write(' min. '), 
